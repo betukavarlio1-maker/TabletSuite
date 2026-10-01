@@ -1,0 +1,65 @@
+name: Build Turnkey Executables
+
+on:
+  push:
+    branches: [ "**" ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Windows Host Server (.exe) Derleme
+    runs-on: windows-latest
+    steps:
+      - name: Kodu Cek
+        uses: actions/checkout@v4
+
+      - name: CMake Yapilandirma
+        run: |
+          mkdir windows_host\build
+          cd windows_host\build
+          cmake .. -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: C++20 Release Derleme
+        run: |
+          cd windows_host\build
+          cmake --build . --config Release --parallel
+
+      - name: HostServer.exe Dosyasini Paketle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows_HostServer_EXE
+          path: |
+            windows_host/build/bin/Release/HostServer.exe
+            windows_host/build/Release/HostServer.exe
+          if-no-files-found: error
+
+  build-android:
+    name: Android Client (.apk) Derleme
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodu Cek
+        uses: actions/checkout@v4
+
+      - name: Java 17 Kurulumu
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Gradle Wrapper Olustur ve Yetkilendir
+        run: |
+          cd android_client
+          gradle wrapper
+          chmod +x gradlew
+
+      - name: APK Derleme (Debug)
+        run: |
+          cd android_client
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Android APK Dosyasini Paketle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android_Tablet_APK
+          path: android_client/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
