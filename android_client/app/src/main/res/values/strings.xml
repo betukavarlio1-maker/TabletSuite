@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Virtual Tablet Suite</string>
+    <string name="mode_passthrough">Masaüstü Modu (Passthrough)</string>
+    <string name="mode_annotate">Çizim Modu (Whiteboard)</string>
+    <string name="tool_pen">Kalem</string>
+    <string name="tool_highlighter">Fosforlu</string>
+    <string name="tool_eraser">Silgi</string>
+    <string name="action_undo">Geri Al</string>
+    <string name="action_redo">Yinele</string>
+    <string name="action_sync">Windows Panosuna Kopyala</string>
+</resources>
