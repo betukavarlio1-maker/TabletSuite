@@ -1,9 +1,14 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include "PointerInjector.h"
 #include <iostream>
 #include <algorithm>
 
 PointerInjector::PointerInjector()
-    : m_targetWidth(1920), m_targetHeight(1080), m_isInitialized(false), m_wasContactActive(false) {}
+    : m_targetWidth(1920), m_targetHeight(1080), m_isInitialized(false),
+      m_wasContactActive(false), m_hPointerDevice(nullptr) {}
 
 PointerInjector::~PointerInjector() {
     Reset();
@@ -13,13 +18,11 @@ bool PointerInjector::Initialize(uint32_t targetWidth, uint32_t targetHeight) {
     m_targetWidth = targetWidth;
     m_targetHeight = targetHeight;
 
-    BOOL result = InitializeTouchInjection(10, TOUCH_FEEDBACK_NONE);
-    if (!result) {
+    m_hPointerDevice = CreateSyntheticPointerDevice(PT_PEN, 1, POINTER_FEEDBACK_DEFAULT);
+    if (!m_hPointerDevice) {
         DWORD err = GetLastError();
-        if (err != ERROR_ALREADY_INITIALIZED) {
-            std::cerr << "[PointerInjector] InitializeTouchInjection hatasi: " << err << std::endl;
-            return false;
-        }
+        std::cerr << "[PointerInjector] CreateSyntheticPointerDevice hatasi: " << err << std::endl;
+        return false;
     }
 
     m_isInitialized = true;
@@ -28,9 +31,12 @@ bool PointerInjector::Initialize(uint32_t targetWidth, uint32_t targetHeight) {
 }
 
 bool PointerInjector::InjectPenInput(const SuiteProtocol::PenInputPayload& payload) {
-    if (!m_isInitialized) return false;
+    if (!m_isInitialized || !m_hPointerDevice) return false;
 
-    POINTER_PEN_INFO penInfo = {};
+    POINTER_TYPE_INFO pointerTypeInfo = {};
+    pointerTypeInfo.type = PT_PEN;
+
+    POINTER_PEN_INFO& penInfo = pointerTypeInfo.penInfo;
     penInfo.pointerInfo.pointerType = PT_PEN;
     penInfo.pointerInfo.pointerId = payload.pointerId;
 
@@ -57,9 +63,9 @@ bool PointerInjector::InjectPenInput(const SuiteProtocol::PenInputPayload& paylo
 
     penInfo.pointerInfo.pointerFlags = pointerFlags;
     penInfo.penMask = PEN_MASK_PRESSURE | PEN_MASK_TILT_X | PEN_MASK_TILT_Y;
-    penInfo.pressure = std::min<UINT32>(payload.pressure, 4096);
-    penInfo.tiltX = std::clamp<INT32>(payload.tiltX, -90, 90);
-    penInfo.tiltY = std::clamp<INT32>(payload.tiltY, -90, 90);
+    penInfo.pressure = (std::min)(static_cast<UINT32>(payload.pressure), 4096u);
+    penInfo.tiltX = std::clamp(static_cast<INT32>(payload.tiltX), -90, 90);
+    penInfo.tiltY = std::clamp(static_cast<INT32>(payload.tiltY), -90, 90);
 
     if (payload.flags & SuiteProtocol::PEN_FLAG_BARREL) {
         penInfo.penFlags |= PEN_FLAG_BARREL;
@@ -68,7 +74,7 @@ bool PointerInjector::InjectPenInput(const SuiteProtocol::PenInputPayload& paylo
         penInfo.penFlags |= PEN_FLAG_INVERTED;
     }
 
-    BOOL injectResult = InjectSyntheticPointerInput(1, reinterpret_cast<POINTER_TYPE_INFO*>(&penInfo));
+    BOOL injectResult = InjectSyntheticPointerInput(m_hPointerDevice, &pointerTypeInfo, 1);
     if (!injectResult) {
         return false;
     }
@@ -77,11 +83,15 @@ bool PointerInjector::InjectPenInput(const SuiteProtocol::PenInputPayload& paylo
 }
 
 void PointerInjector::Reset() {
-    if (m_wasContactActive) {
+    if (m_wasContactActive && m_hPointerDevice) {
         SuiteProtocol::PenInputPayload upPayload = {};
         upPayload.flags = SuiteProtocol::PEN_FLAG_UP;
         InjectPenInput(upPayload);
         m_wasContactActive = false;
+    }
+    if (m_hPointerDevice) {
+        DestroySyntheticPointerDevice(m_hPointerDevice);
+        m_hPointerDevice = nullptr;
     }
     m_isInitialized = false;
 }

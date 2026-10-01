@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include <windows.h>
 #include <cstdint>
 #include "ProtocolDef.h"
@@ -18,4 +22,5 @@ private:
     uint32_t m_targetHeight;
     bool m_isInitialized;
     bool m_wasContactActive;
+    HSYNTHETICPOINTERDEVICE m_hPointerDevice;
 };
